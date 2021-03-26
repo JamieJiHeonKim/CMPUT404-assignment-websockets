@@ -6,7 +6,7 @@
     <meta content='width=device-width; height=device-height; initial-scale=1.0; maximum-scale=1.0; user-scalable=0;' name='viewport' />
     <meta name="viewport" content="width=device-width" />
     <meta name="license" content="
-        Copyright 2013 Google, Abram Hindle
+        Copyright 2013 Google, Abram Hindle, Ji Heon Kim
         
         Licensed under the Apache License, Version 2.0 (the "License");
         you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ function drawCircle(context,entity) {
         fillStyle = entity["colour"];
         strokeStyle = fillStyle;
         arc(x, y, (entity["radius"])?entity["radius"]:50, 0, 2.0 * Math.PI, false);  
-        stroke();                                
+        fill();                                
     }
 }
 
@@ -125,6 +125,9 @@ function addEntity(entity, data) {
     world[entity] = data;
     drawNextFrame(); // (but should we?)
     //XXX: Send a XHTML Request that updates the entity you just modified!
+    var entityInfo = {[entity]: data};
+    socket.send(JSON.stringify(entityInfo));
+
 }
 var counter = 0;
 function addEntityWithoutName(data) {
@@ -235,11 +238,11 @@ mouse.mousedowners.push(function(x,y,clicked,e) {
 });
 
 mouse.mouseuppers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'red'});
+    addEntityWithoutName({'x':x,'y':y,'colour':'white'});
 });
 
 mouse.mousedraggers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'green',
+    addEntityWithoutName({'x':x,'y':y,'colour':'yellow',
                           'radius':10});
 });
 
@@ -254,14 +257,41 @@ function wsSetup() {
     socket = new WebSocket(url);
     socket.onopen = function() {
         //XXX: TODO What are you going to do here?
+        var xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState==4) {
+                try {
+                    if (xhr.status==200) {
+                        //XXX: parse some JSON from the request!
+                        var obj = JSON.stringify(xhr.responseText);
+                        for (i in obj) {
+                            world[i] = obj[i];
+                        }
+                    }
+                }
+                catch(e) {
+                    alert('Error: ' + e.name);
+                }
+            }
+        };
+        
+        xhr.open("POST", url, true);
+        xhr.send();
     };
+
+
     socket.onerror = function(msg) {
         debug("WebSocket Error:" + msg.data);
     };
     socket.onmessage = function(msg) {  
         try {
             debug("WebSocket Recv:" + msg.data);
-            //XXX: TODO What are you going to do here?            
+            //XXX: TODO What are you going to do here?     
+            messages = JSON.parse(msg.data);
+            for (message in messages) {
+                world[message] = messages[message];
+            }
+            drawNextFrame();
         } catch (e) {
             alert("socket on message: " + e);
         }
